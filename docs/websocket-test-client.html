@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Ticket WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        input, button { padding: 10px; margin: 5px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        #messages { background: white; padding: 15px; border-radius: 4px; min-height: 200px; max-height: 400px; overflow-y: auto; }
+        .message { padding: 8px; margin: 5px 0; border-radius: 4px; }
+        .message.incoming { background: #e3f2fd; }
+        .message.outgoing { background: #f3e5f5; }
+        .status { color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔌 Support Ticket WebSocket Test Client</h1>
+
+    <div class="container">
+        <h3>Connection</h3>
+        <input type="text" id="token" placeholder="JWT Token" style="width: 300px;">
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <div id="connectionStatus" class="status">Disconnected</div>
+    </div>
+
+    <div class="container">
+        <h3>Ticket Room</h3>
+        <input type="text" id="ticketId" placeholder="Ticket ID">
+        <button onclick="joinTicket()">Join Ticket</button>
+        <button onclick="leaveTicket()">Leave Ticket</button>
+    </div>
+
+    <div class="container">
+        <h3>Messages</h3>
+        <div id="messages"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('connectionStatus');
+
+        function addMessage(type, data) {
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong><br>${JSON.stringify(data, null, 2)}`;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            socket = io('http://localhost:5000', {
+                auth: { token }
+            });
+
+            socket.on('connect', () => {
+                statusDiv.textContent = `Connected (ID: ${socket.id})`;
+                statusDiv.style.color = 'green';
+                addMessage('outgoing', { event: 'connected', socketId: socket.id });
+            });
+
+            socket.on('disconnect', () => {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.style.color = 'red';
+            });
+
+            socket.on('ticket-created', (data) => {
+                addMessage('incoming', { event: 'ticket-created', data });
+            });
+
+            socket.on('ticket-updated', (data) => {
+                addMessage('incoming', { event: 'ticket-updated', data });
+            });
+
+            socket.on('ticket-assigned', (data) => {
+                addMessage('incoming', { event: 'ticket-assigned', data });
+            });
+
+            socket.on('ticket-comment', (data) => {
+                addMessage('incoming', { event: 'ticket-comment', data });
+            });
+
+            socket.on('notification', (data) => {
+                addMessage('incoming', { event: 'notification', data });
+            });
+
+            socket.on('user-typing', (data) => {
+                addMessage('incoming', { event: 'user-typing', data });
+            });
+
+            socket.on('error', (error) => {
+                addMessage('incoming', { event: 'error', error });
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function joinTicket() {
+            const ticketId = document.getElementById('ticketId').value;
+            if (socket && ticketId) {
+                socket.emit('join-ticket', ticketId);
+                addMessage('outgoing', { event: 'join-ticket', ticketId });
+            }
+        }
+
+        function leaveTicket() {
+            const ticketId = document.getElementById('ticketId').value;
+            if (socket && ticketId) {
+                socket.emit('leave-ticket', ticketId);
+                addMessage('outgoing', { event: 'leave-ticket', ticketId });
+            }
+        }
+    </script>
+</body>
+</html>
